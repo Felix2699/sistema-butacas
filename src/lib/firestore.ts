@@ -60,6 +60,23 @@ export interface Reserva {
   createdAt: any;
   qrCode?: string;
   attended?: boolean;
+  vendedorId?: string;
+  vendedorName?: string;
+}
+
+export interface Vendedor {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export interface Gasto {
+  id?: string;
+  date: string;
+  reason: string;
+  amount: number;
+  voucherBase64?: string | null;
+  createdAt: any;
 }
 
 export interface Zona {
@@ -230,6 +247,11 @@ export async function updateReservaPayment(id: string, newTotalPaid: number, new
   });
 }
 
+export async function updateReservaInfo(id: string, data: Partial<Reserva>): Promise<void> {
+  const reservaRef = doc(db, 'reservas', id);
+  await updateDoc(reservaRef, data);
+}
+
 // Agregar nuevo abono desde la interfaz de consulta (cliente)
 export async function addReservaPayment(id: string, newPayment: PaymentRecord): Promise<void> {
   const reservaRef = doc(db, 'reservas', id);
@@ -285,4 +307,45 @@ export function subscribeToReservas(callback: (reservas: Reserva[]) => void) {
     });
     callback(reservas);
   });
+}
+
+// =======================
+// VENDEDORES
+// =======================
+export function subscribeToVendedores(callback: (vendedores: Vendedor[]) => void) {
+  return onSnapshot(collection(db, 'vendedores'), (snapshot) => {
+    const data: Vendedor[] = [];
+    snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() } as Vendedor));
+    callback(data);
+  });
+}
+
+export async function saveVendedor(vendedor: Vendedor): Promise<void> {
+  await setDoc(doc(db, 'vendedores', vendedor.id), vendedor);
+}
+
+export async function deleteVendedor(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'vendedores', id));
+}
+
+// =======================
+// GASTOS
+// =======================
+export function subscribeToGastos(callback: (gastos: Gasto[]) => void) {
+  return onSnapshot(collection(db, 'gastos'), (snapshot) => {
+    const data: Gasto[] = [];
+    snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() } as Gasto));
+    // Sort descending by date
+    data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    callback(data);
+  });
+}
+
+export async function addGasto(gasto: Omit<Gasto, 'id'>): Promise<void> {
+  const { addDoc } = await import('firebase/firestore');
+  await addDoc(collection(db, 'gastos'), gasto);
+}
+
+export async function deleteGasto(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'gastos', id));
 }

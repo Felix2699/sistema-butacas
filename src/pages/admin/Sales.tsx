@@ -9,17 +9,21 @@ import {
   PlusCircle, 
   Check, 
   Receipt,
-  DollarSign
+  DollarSign,
+  Edit
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { generateTicketPDF } from '../../lib/pdfGenerator';
 import { 
   subscribeToReservas, 
   updateReservaPaymentsAndTotal,
+  updateReservaInfo,
+  subscribeToVendedores,
   getEventDates,
   type Reserva, 
   type EventDate,
-  type PaymentRecord
+  type PaymentRecord,
+  type Vendedor
 } from '../../lib/firestore';
 
 const statusBadge = {
@@ -37,7 +41,12 @@ export default function Sales() {
   const [sales, setSales] = useState<Reserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [voucherModal, setVoucherModal] = useState<string | null>(null);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   
+  // Modal de edición de datos
+  const [editingSale, setEditingSale] = useState<Reserva | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Reserva>>({});
+
   // Modal de gestión de abonos y validación
   const [managingSale, setManagingSale] = useState<Reserva | null>(null);
   const [editablePayments, setEditablePayments] = useState<PaymentRecord[]>([]);
@@ -56,7 +65,12 @@ export default function Sales() {
       setSales(data.reverse());
       setLoading(false);
     });
-    return () => unsubscribe();
+    const unsubVendors = subscribeToVendedores(setVendedores);
+
+    return () => {
+      unsubscribe();
+      unsubVendors();
+    };
   }, []);
 
   // Abrir modal de gestión de abonos
@@ -129,6 +143,29 @@ export default function Sales() {
       alert('Hubo un error al guardar los pagos.');
     } finally {
       setIsSavingPayments(false);
+    }
+  };
+
+  const handleOpenEdit = (sale: Reserva) => {
+    setEditingSale(sale);
+    setEditForm({
+      fullName: sale.fullName,
+      dni: sale.dni,
+      zoneName: sale.zoneName,
+      seatId: sale.seatId,
+      vendedorId: sale.vendedorId,
+      vendedorName: sale.vendedorName
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSale?.id) return;
+    try {
+      await updateReservaInfo(editingSale.id, editForm);
+      setEditingSale(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error guardando los datos');
     }
   };
 
@@ -397,6 +434,15 @@ export default function Sales() {
                         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition"
                       >
                         <Download size={16} />
+                      </button>
+
+                      {/* Editar Información */}
+                      <button
+                        title="Editar Información"
+                        onClick={() => handleOpenEdit(sale)}
+                        className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition"
+                      >
+                        <Edit size={16} />
                       </button>
                     </div>
                   </td>
@@ -728,6 +774,80 @@ export default function Sales() {
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA EDITAR INFORMACIÓN DE RESERVA */}
+      {editingSale && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto" onClick={() => setEditingSale(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <Edit size={18} className="text-blue-500" /> Editar Reserva
+              </h3>
+              <button onClick={() => setEditingSale(null)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 flex items-center justify-center font-bold text-base transition">
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Nombre Completo</label>
+                <input 
+                  type="text" 
+                  value={editForm.fullName || ''} 
+                  onChange={e => setEditForm({...editForm, fullName: e.target.value.toUpperCase()})}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">DNI</label>
+                <input 
+                  type="text" 
+                  value={editForm.dni || ''} 
+                  onChange={e => setEditForm({...editForm, dni: e.target.value})}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Zona</label>
+                  <input 
+                    type="text" 
+                    value={editForm.zoneName || ''} 
+                    onChange={e => setEditForm({...editForm, zoneName: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Butaca</label>
+                  <input 
+                    type="text" 
+                    value={editForm.seatId || ''} 
+                    onChange={e => setEditForm({...editForm, seatId: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Vendedor</label>
+                <select
+                  value={editForm.vendedorId || ''}
+                  onChange={e => {
+                    const v = vendedores.find(x => x.id === e.target.value);
+                    setEditForm({...editForm, vendedorId: v?.id || '', vendedorName: v?.name || ''});
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                >
+                  <option value="">Sin Vendedor (Cliente Web)</option>
+                  {vendedores.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button onClick={() => setEditingSale(null)} className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-200 transition text-sm font-semibold">Cancelar</button>
+              <button onClick={handleSaveEdit} className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-sm font-bold shadow-md">Guardar Cambios</button>
             </div>
           </div>
         </div>

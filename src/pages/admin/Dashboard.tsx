@@ -3,17 +3,21 @@ import { Calendar, Users, CreditCard, Sparkles } from 'lucide-react';
 import { 
   subscribeToReservas, 
   getEventDates, 
+  getZonas,
   type Reserva, 
-  type EventDate 
+  type EventDate,
+  type Zona
 } from '../../lib/firestore';
 
 export default function Dashboard() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [eventDates, setEventDates] = useState<EventDate[]>([]);
+  const [zonas, setZonas] = useState<Zona[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getEventDates().then(setEventDates).catch(console.error);
+    getZonas().then(setZonas).catch(console.error);
 
     const unsubscribe = subscribeToReservas((data) => {
       setReservas(data);
@@ -94,6 +98,51 @@ export default function Dashboard() {
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Recaudado</span>
                     <span className="text-base font-black text-green-700 mt-0.5 block">S/ {dateIncome.toFixed(0)}</span>
                   </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* REPORTE DE ZONAS */}
+      <div className="space-y-4 pt-4">
+        <h2 className="text-lg font-black text-slate-900">Reporte de Zonas y Stock</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {eventDates.map(d => {
+            const dateReservas = reservas.filter(r => r.eventDateId === d.id || (!r.eventDateId && d.id === 'd1'));
+            return (
+              <div key={`report-${d.id}`} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
+                <h3 className="font-bold text-slate-800 mb-4">{d.name} <span className="text-xs text-slate-400 font-normal ml-2">{d.dateText}</span></h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs text-slate-500 font-bold">
+                      <tr>
+                        <th className="px-3 py-2 rounded-l-lg">ZONA</th>
+                        <th className="px-3 py-2 text-right">TOTAL BUTACAS</th>
+                        <th className="px-3 py-2 text-right">VENDIDAS</th>
+                        <th className="px-3 py-2 text-right rounded-r-lg">STOCK</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {zonas.map(z => {
+                        const vendidos = dateReservas.filter(r => r.zoneId === z.id || r.zoneName === z.name).length;
+                        const total = z.type === 'numbered' ? ((z.rows || 0) * (z.seatsPerRow || 0)) : (z.stockTotal || 0);
+                        const disponible = total - vendidos;
+                        return (
+                          <tr key={z.id}>
+                            <td className="px-3 py-2 font-medium flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: z.color }}></span>
+                              {z.name}
+                            </td>
+                            <td className="px-3 py-2 text-right">{total}</td>
+                            <td className="px-3 py-2 text-right font-bold text-primary-dark">{vendidos}</td>
+                            <td className="px-3 py-2 text-right font-black text-green-600">{disponible}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             );

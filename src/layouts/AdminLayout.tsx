@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Map, QrCode, LogOut, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, Map, QrCode, LogOut, Calendar, Briefcase, Wallet } from 'lucide-react';
 import { clsx } from 'clsx';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -8,6 +8,8 @@ const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/fechas', label: 'Fechas de Evento', icon: Calendar, end: false },
   { to: '/admin/ventas', label: 'Ventas / Pagos', icon: Users, end: false },
+  { to: '/admin/vendedores', label: 'Vendedores', icon: Briefcase, end: false },
+  { to: '/admin/gastos', label: 'Gastos', icon: Wallet, end: false },
   { to: '/admin/mapa', label: 'Configurar Zonas', icon: Map, end: false },
   { to: '/admin/scanner', label: 'Lector QR', icon: QrCode, end: false },
 ];

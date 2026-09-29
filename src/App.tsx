@@ -10,6 +10,8 @@ import Sales from './pages/admin/Sales';
 import MapConfig from './pages/admin/MapConfig';
 import QRScanner from './pages/admin/QRScanner';
 import EventDatesConfig from './pages/admin/EventDatesConfig';
+import Vendedores from './pages/admin/Vendedores';
+import Gastos from './pages/admin/Gastos';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
             <Route path="ventas" element={<Sales />} />
             <Route path="mapa" element={<MapConfig />} />
             <Route path="scanner" element={<QRScanner />} />
+            <Route path="vendedores" element={<Vendedores />} />
+            <Route path="gastos" element={<Gastos />} />
           </Route>
         </Route>
         <Route path="/login" element={<Login />} />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import SeatMap from '../components/SeatMap';
 import { fetchDniData } from '../lib/api';
 import { db } from '../lib/firebase';
@@ -18,8 +19,10 @@ import { clsx } from 'clsx';
 import { 
   subscribeToEventDates, 
   subscribeToEventSettings,
+  subscribeToVendedores,
   type EventDate, 
-  type EventSettings 
+  type EventSettings,
+  type Vendedor
 } from '../lib/firestore';
 import { 
   ZONAS_MAP, 
@@ -35,6 +38,8 @@ interface FormData {
   phone: string;
   certificateName: string;
   city: string;
+  vendedorId: string;
+  vendedorName: string;
 }
 
 const initialForm: FormData = {
@@ -44,6 +49,8 @@ const initialForm: FormData = {
   phone: '',
   certificateName: '',
   city: '',
+  vendedorId: '',
+  vendedorName: '',
 };
 
 export default function Booking() {
@@ -64,6 +71,7 @@ export default function Booking() {
   const [dniFetched, setDniFetched] = useState(false);
 
   // Payment voucher / OCR State
+  const [paymentMethod, setPaymentMethod] = useState('Transferencia');
   const [voucherPreview, setVoucherPreview] = useState<string | null>(null);
   const [operationNumber, setOperationNumber] = useState('');
   const [detectedAmount, setDetectedAmount] = useState<number | null>(null);
@@ -71,6 +79,9 @@ export default function Booking() {
   const [amountDetected, setAmountDetected] = useState<boolean>(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [ocrDetected, setOcrDetected] = useState(false);
+
+  // Vendedores
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
 
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,9 +101,14 @@ export default function Booking() {
       setSettings(s);
     });
 
+    const unsubVendedores = subscribeToVendedores((v) => {
+      setVendedores(v.filter(x => x.active));
+    });
+
     return () => {
       unsubDates();
       unsubSettings();
+      unsubVendedores();
     };
   }, []);
 
@@ -214,6 +230,13 @@ export default function Booking() {
         setOcrDetected(true);
       }
 
+      // Detectar Método de Pago (Yape/Plin)
+      let foundMethod = paymentMethod;
+      if (/yape/i.test(text)) foundMethod = 'Yape';
+      else if (/plin/i.test(text)) foundMethod = 'Plin';
+      else if (/bcp|interbank|bbva|scotiabank/i.test(text)) foundMethod = 'Transferencia';
+      setPaymentMethod(foundMethod);
+
       // 2. Extraer monto pagado
       const clean = text.replace(/[\r\n]+/g, ' ');
       const amountPatterns = [
@@ -304,11 +327,13 @@ export default function Booking() {
         seatId: selectedSeat || null,
         totalPrice: ticketTotalPrice,
         totalPaid: 0, // se confirma por admin
+        vendedorId: form.vendedorId || null,
+        vendedorName: form.vendedorName || null,
         payments: [{
           amount: parsedPaid,
           operationNumber: operationNumber.trim(),
           date: new Date().toISOString(),
-          method: 'Transferencia/Yape/Plin',
+          method: paymentMethod,
           verified: false,
           voucherBase64: voucherBase64,
           detectedAmount: detectedAmount || parsedPaid,
@@ -378,12 +403,12 @@ export default function Booking() {
           <p className="text-xs text-slate-400">
             Código de reserva: <span className="font-mono text-slate-600 font-medium">{bookingId.slice(0, 12).toUpperCase()}</span>
           </p>
-          <a
-            href="/tracking"
+          <Link
+            to="/tracking"
             className="w-full py-3.5 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl transition text-center block shadow-md"
           >
             Consultar Estado de Mi Entrada con DNI →
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -647,10 +672,53 @@ export default function Booking() {
                 />
               </div>
 
+              {/* Vendedor (Opcional) */}
+              {vendedores.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    ¿Te atendió un vendedor? (Opcional)
+                  </label>
+                  <select
+                    value={form.vendedorId}
+                    onChange={(e) => {
+                      const v = vendedores.find(x => x.id === e.target.value);
+                      setForm(prev => ({ ...prev, vendedorId: v?.id || '', vendedorName: v?.name || '' }));
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm"
+                  >
+                    <option value="">Selecciona un vendedor</option>
+                    {vendedores.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Comprobante de Pago */}
               <div className="pt-2 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  Método de Pago <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {['Yape', 'Plin', 'Transferencia'].map(method => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setPaymentMethod(method)}
+                      className={clsx(
+                        "py-2 px-1 text-xs font-bold rounded-xl border transition-all text-center",
+                        paymentMethod === method
+                          ? "bg-primary/10 border-primary text-primary-dark"
+                          : "border-slate-200 text-slate-500 hover:border-primary/50"
+                      )}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Comprobante de Pago (Yape / Plin / Transferencia) <span className="text-red-500">*</span>
+                  Comprobante de Pago <span className="text-red-500">*</span>
                 </label>
 
                 <label className="block cursor-pointer group">
