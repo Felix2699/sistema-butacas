@@ -12,6 +12,7 @@ import QRScanner from './pages/admin/QRScanner';
 import EventDatesConfig from './pages/admin/EventDatesConfig';
 import Vendedores from './pages/admin/Vendedores';
 import Gastos from './pages/admin/Gastos';
+import ReporteCaja from './pages/admin/ReporteCaja';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
             <Route path="scanner" element={<QRScanner />} />
             <Route path="vendedores" element={<Vendedores />} />
             <Route path="gastos" element={<Gastos />} />
+            <Route path="caja" element={<ReporteCaja />} />
           </Route>
         </Route>
         <Route path="/login" element={<Login />} />

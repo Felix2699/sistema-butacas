@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle, 
   Eye, 
@@ -10,12 +10,14 @@ import {
   Check, 
   Receipt,
   DollarSign,
-  Edit
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { generateTicketPDF } from '../../lib/pdfGenerator';
 import { 
-  subscribeToReservas, 
+  subscribeToReservas,
+  createReserva, 
   updateReservaPaymentsAndTotal,
   updateReservaInfo,
   subscribeToVendedores,
@@ -35,6 +37,7 @@ const statusLabel = { paid: 'Pagado', partial: 'Parcial', pending: 'Pendiente' }
 
 export default function Sales() {
   const [search, setSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [filter, setFilter] = useState<'all' | 'paid' | 'partial' | 'pending'>('all');
   const [filterDate, setFilterDate] = useState<string>('all');
   const [eventDates, setEventDates] = useState<EventDate[]>([]);
@@ -51,6 +54,8 @@ export default function Sales() {
   const [managingSale, setManagingSale] = useState<Reserva | null>(null);
   const [editablePayments, setEditablePayments] = useState<PaymentRecord[]>([]);
   const [isSavingPayments, setIsSavingPayments] = useState(false);
+  const [addInvitadoModal, setAddInvitadoModal] = useState(false);
+  const [invitadoForm, setInvitadoForm] = useState({ fullName: '', dni: '', zoneName: '', seatId: '', type: 'Invitado', eventDateId: '' });
 
   // Formulario para nuevo abono manual desde administración
   const [showAddManualPayment, setShowAddManualPayment] = useState(false);
@@ -101,6 +106,21 @@ export default function Sales() {
       next[index] = { ...next[index], amount: isNaN(num) ? 0 : num };
       return next;
     });
+  };
+
+  // Cambiar metodo de pago de un abono individual
+  const handleMethodChange = (index: number, val: string) => {
+    setEditablePayments(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], method: val };
+      return next;
+    });
+  };
+
+  // Eliminar un abono individual
+  const handleDeletePayment = (index: number) => {
+    if (!confirm('¿Eliminar este abono? Esta acción no se puede deshacer una vez guardado.')) return;
+    setEditablePayments(prev => prev.filter((_, i) => i !== index));
   };
 
   // Validar todos los abonos a la vez
@@ -202,6 +222,39 @@ export default function Sales() {
     return matchSearch && matchFilter && matchDate;
   });
 
+  
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedSales = React.useMemo(() => {
+    let sortableItems = [...filtered];
+    if (sortConfig !== null) {
+      sortableItems.sort((a: any, b: any) => {
+        let valA = a[sortConfig.key] || '';
+        let valB = b[sortConfig.key] || '';
+        
+        // Special handle for dates if createdAt
+        if (sortConfig.key === 'createdAt') {
+          valA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+          valB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        }
+
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filtered, sortConfig]);
+
   const totalPaidCount = sales.filter(s => s.paymentStatus === 'paid').length;
   const totalPartialCount = sales.filter(s => s.paymentStatus === 'partial').length;
   const totalPendingCount = sales.filter(s => s.paymentStatus === 'pending').length;
@@ -221,9 +274,14 @@ export default function Sales() {
           <h1 className="text-3xl font-bold text-slate-900">Ventas y Gestión de Pagos</h1>
           <p className="text-slate-500 text-sm mt-1">Supervisa las ventas, valida abonos parciales y autoriza la emisión de entradas oficiales.</p>
         </div>
-        <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-medium text-sm hover:bg-slate-800 transition shadow-sm">
-          <Download size={16} /> Exportar CSV
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setAddInvitadoModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl font-medium text-sm hover:bg-primary-dark transition shadow-sm">
+            + Invitado / Staff
+          </button>
+          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-medium text-sm hover:bg-slate-800 transition shadow-sm">
+            <Download size={16} /> Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -293,13 +351,18 @@ export default function Sales() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {['Persona', 'DNI', 'Zona / Butaca', 'Estado', 'Pagado / Total', 'Historial Abonos', 'Fecha Registro', 'Acciones'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('fullName')}><div className="flex items-center gap-1">Persona <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('dni')}><div className="flex items-center gap-1">DNI <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('zoneName')}><div className="flex items-center gap-1">Zona / Butaca <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('paymentStatus')}><div className="flex items-center gap-1">Estado <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('totalPaid')}><div className="flex items-center gap-1">Pagado / Total <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Historial Abonos</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('createdAt')}><div className="flex items-center gap-1">Fecha Registro <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map(sale => {
+              {sortedSales.map(sale => {
                 const dateStr = sale.createdAt && (sale.createdAt as any).toDate 
                   ? (sale.createdAt as any).toDate().toLocaleString() 
                   : '—';
@@ -591,10 +654,10 @@ export default function Sales() {
                           onChange={e => setManualMethod(e.target.value)}
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-primary/20"
                         >
-                          <option value="Transferencia Bancaria">Transferencia</option>
-                          <option value="Efectivo en Caja">Efectivo</option>
                           <option value="Yape">Yape</option>
                           <option value="Plin">Plin</option>
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia Bancaria">Transferencia</option>
                           <option value="POS / Tarjeta">POS / Tarjeta</option>
                         </select>
                       </div>
@@ -644,7 +707,17 @@ export default function Sales() {
                               <span className="font-mono text-xs font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-md">
                                 Op: {p.operationNumber || 'Sin número'}
                               </span>
-                              <span className="text-[11px] text-slate-500 font-medium">{p.method}</span>
+                              <select
+                                value={p.method || ''}
+                                onChange={e => handleMethodChange(idx, e.target.value)}
+                                className="text-[11px] text-slate-700 font-bold bg-slate-100 px-2 py-0.5 rounded outline-none border border-slate-200"
+                              >
+                                <option value="Yape">Yape</option>
+                                <option value="Plin">Plin</option>
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Transferencia Bancaria">Transferencia</option>
+                                <option value="POS / Tarjeta">POS / Tarjeta</option>
+                              </select>
                             </div>
 
                             <p className="text-[11px] text-slate-400">
@@ -683,6 +756,15 @@ export default function Sales() {
                                 className="w-24 px-2.5 py-1.5 rounded-xl border border-slate-300 text-sm font-black text-slate-900 bg-white outline-none focus:ring-2 focus:ring-primary/20"
                               />
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePayment(idx)}
+                              className="px-2 py-2 rounded-xl text-xs font-black bg-red-100 hover:bg-red-200 text-red-600 transition"
+                              title="Eliminar abono"
+                            >
+                              <Trash2 size={14} />
+                            </button>
 
                             <button
                               type="button"
@@ -852,6 +934,131 @@ export default function Sales() {
           </div>
         </div>
       )}
+
+      {/* MODAL AÑADIR INVITADO / STAFF */}
+      {addInvitadoModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto" onClick={() => setAddInvitadoModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <PlusCircle size={18} className="text-primary" /> Añadir Invitado o Staff
+              </h3>
+              <button onClick={() => setAddInvitadoModal(false)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 flex items-center justify-center font-bold text-base transition">
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Nombre Completo</label>
+                <input 
+                  type="text" 
+                  value={invitadoForm.fullName} 
+                  onChange={e => setInvitadoForm({...invitadoForm, fullName: e.target.value.toUpperCase()})}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">DNI (Para el QR)</label>
+                  <input 
+                    type="text" 
+                    value={invitadoForm.dni} 
+                    onChange={e => setInvitadoForm({...invitadoForm, dni: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Tipo</label>
+                  <select 
+                    value={invitadoForm.type} 
+                    onChange={e => setInvitadoForm({...invitadoForm, type: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                  >
+                    <option value="Invitado">Invitado</option>
+                    <option value="Staff">Staff</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Zona</label>
+                  <input 
+                    type="text" 
+                    value={invitadoForm.zoneName} 
+                    onChange={e => setInvitadoForm({...invitadoForm, zoneName: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Butaca (Opcional)</label>
+                  <input 
+                    type="text" 
+                    value={invitadoForm.seatId} 
+                    onChange={e => setInvitadoForm({...invitadoForm, seatId: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Fecha del Evento</label>
+                <select 
+                  value={invitadoForm.eventDateId} 
+                  onChange={e => setInvitadoForm({...invitadoForm, eventDateId: e.target.value})}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                >
+                  <option value="">Seleccione una fecha</option>
+                  {eventDates.map(d => <option key={d.id} value={d.id}>{d.name} ({d.dateText})</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button onClick={() => setAddInvitadoModal(false)} className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-200 transition text-sm font-semibold">Cancelar</button>
+              <button onClick={async () => {
+                if(!invitadoForm.fullName || !invitadoForm.dni || !invitadoForm.eventDateId || !invitadoForm.zoneName) {
+                  alert('Llena los campos requeridos (Nombre, DNI, Fecha y Zona)');
+                  return;
+                }
+                const dateObj = eventDates.find(d => d.id === invitadoForm.eventDateId);
+                const reservaObj = {
+                  fullName: invitadoForm.fullName,
+                  dni: invitadoForm.dni,
+                  email: '',
+                  phone: '',
+                  zoneId: 'custom',
+                  zoneName: invitadoForm.zoneName,
+                  seatId: invitadoForm.seatId,
+                  totalPrice: 0,
+                  totalPaid: 0,
+                  paymentPlan: 'full',
+                  paymentStatus: 'paid',
+                  method: invitadoForm.type,
+                  payments: [{
+                    amount: 0,
+                    operationNumber: invitadoForm.type,
+                    date: new Date().toLocaleString('es-PE'),
+                    method: invitadoForm.type,
+                    verified: true,
+                    note: 'Registrado desde Admin'
+                  }],
+                  createdAt: new Date(),
+                  qrCode: `EVT-2026-${invitadoForm.dni}-${invitadoForm.seatId || 'GEN'}`,
+                  eventDateId: dateObj?.id,
+                  eventDateName: dateObj?.name
+                };
+                try {
+                  await createReserva(reservaObj as any, invitadoForm.dni + '-' + Date.now().toString().slice(-4));
+                  setAddInvitadoModal(false);
+                  setInvitadoForm({ fullName: '', dni: '', zoneName: '', seatId: '', type: 'Invitado', eventDateId: '' });
+                } catch(e) {
+                  console.error(e);
+                  alert('Error al registrar');
+                }
+              }} className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition text-sm font-bold shadow-md">Crear Registro</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

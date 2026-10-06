@@ -29,6 +29,8 @@ export interface EventSettings {
 
 export interface PaymentRecord {
   amount: number;
+    vendedorId?: string;
+    vendedorName?: string;
   operationNumber: string;
   date: string;
   method: string;
@@ -54,6 +56,7 @@ export interface Reserva {
   paymentPlan?: 'full' | 'installments';
   installmentNumber?: number;
   paymentStatus: 'pending' | 'partial' | 'paid';
+    method?: string;
   totalPrice: number;
   totalPaid: number;
   payments: PaymentRecord[];
@@ -75,6 +78,9 @@ export interface Gasto {
   date: string;
   reason: string;
   amount: number;
+    vendedorId?: string;
+    vendedorName?: string;
+  method?: string;
   voucherBase64?: string | null;
   createdAt: any;
 }
@@ -222,20 +228,18 @@ export async function getReservaByQr(qrCode: string): Promise<Reserva | null> {
   return { id: docSnap.id, ...docSnap.data() } as Reserva;
 }
 
-export async function getOccupiedSeats(eventDateId?: string | null): Promise<{zoneId: string, seatId: string}[]> {
-  const querySnapshot = await getDocs(collection(db, 'reservas'));
-  const occupied: {zoneId: string, seatId: string}[] = [];
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    if (data.zoneId && data.seatId) {
-      // Si se filtra por fecha, solo incluir si coincide la fecha
-      // O si la reserva antigua no tenía fecha y consultamos d1
-      if (!eventDateId || data.eventDateId === eventDateId || (!data.eventDateId && eventDateId === 'd1')) {
-        occupied.push({ zoneId: data.zoneId, seatId: data.seatId });
+export async function getOccupiedSeats(eventDateId?: string | null): Promise<{zoneId: string, seatId: string, method?: string}[]> {
+    const querySnapshot = await getDocs(collection(db, 'reservas'));
+    const occupied: {zoneId: string, seatId: string, method?: string}[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.zoneId && data.seatId) {
+        if (!eventDateId || data.eventDateId === eventDateId || (!data.eventDateId && eventDateId === 'd1')) {
+          occupied.push({ zoneId: data.zoneId, seatId: data.seatId, method: data.method });
+        }
       }
-    }
-  });
-  return occupied;
+    });
+    return occupied;
 }
 
 export async function updateReservaPayment(id: string, newTotalPaid: number, newStatus: Reserva['paymentStatus'], newPayments: Reserva['payments']): Promise<void> {
@@ -344,6 +348,11 @@ export function subscribeToGastos(callback: (gastos: Gasto[]) => void) {
 export async function addGasto(gasto: Omit<Gasto, 'id'>): Promise<void> {
   const { addDoc } = await import('firebase/firestore');
   await addDoc(collection(db, 'gastos'), gasto);
+}
+
+export async function updateGasto(id: string, data: Partial<Gasto>): Promise<void> {
+  const ref = doc(db, 'gastos', id);
+  await updateDoc(ref, data);
 }
 
 export async function deleteGasto(id: string): Promise<void> {

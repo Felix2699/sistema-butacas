@@ -530,6 +530,7 @@ export default function TrackingPortal() {
                   >
                     <option value="Yape">Yape</option>
                     <option value="Plin">Plin</option>
+                    <option value="Efectivo">Efectivo</option>
                     <option value="Transferencia BCP">Transferencia BCP</option>
                     <option value="Transferencia BBVA">Transferencia BBVA</option>
                     <option value="Transferencia Interbank">Transferencia Interbank</option>

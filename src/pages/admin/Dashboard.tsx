@@ -3,21 +3,27 @@ import { Calendar, Users, CreditCard, Sparkles } from 'lucide-react';
 import { 
   subscribeToReservas, 
   getEventDates, 
-  getZonas,
   type Reserva, 
   type EventDate,
-  type Zona
 } from '../../lib/firestore';
+
+const REAL_ZONAS = [
+  { id: 'iconic', name: 'ICONIC Experiencia', total: 62, color: '#ef4444' },
+  { id: 'glam', name: 'GLAM - Nivel 01', total: 154, color: '#eab308' },
+  { id: 'elite', name: 'ÉLITE - Nivel 02', total: 104, color: '#fb7185' },
+  { id: 'bronce', name: 'BRONCE - Nivel 03', total: 358, color: '#d97706' },
+  { id: 'invitados', name: 'INVITADOS', total: 20, color: '#06b6d4' },
+  { id: 'staff', name: 'STAFF', total: 18, color: '#0f172a' }
+];
 
 export default function Dashboard() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [eventDates, setEventDates] = useState<EventDate[]>([]);
-  const [zonas, setZonas] = useState<Zona[]>([]);
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getEventDates().then(setEventDates).catch(console.error);
-    getZonas().then(setZonas).catch(console.error);
+    
 
     const unsubscribe = subscribeToReservas((data) => {
       setReservas(data);
@@ -125,9 +131,14 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {zonas.map(z => {
-                        const vendidos = dateReservas.filter(r => r.zoneId === z.id || r.zoneName === z.name).length;
-                        const total = z.type === 'numbered' ? ((z.rows || 0) * (z.seatsPerRow || 0)) : (z.stockTotal || 0);
+                      {REAL_ZONAS.map(z => {
+                        let vendidos = 0;
+                        if (z.id === 'invitados' || z.id === 'staff') {
+                            vendidos = dateReservas.filter(r => (r.method || '').toLowerCase() === z.id).length;
+                        } else {
+                            vendidos = dateReservas.filter(r => r.zoneId === z.id || r.zoneName === z.name).length;
+                        }
+                        const total = z.total;
                         const disponible = total - vendidos;
                         return (
                           <tr key={z.id}>
@@ -142,6 +153,28 @@ export default function Dashboard() {
                         );
                       })}
                     </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200 font-black">
+                      <tr>
+                        <td className="px-3 py-2">TOTAL GENERAL</td>
+                        <td className="px-3 py-2 text-right">{REAL_ZONAS.reduce((acc, z) => acc + z.total, 0)}</td>
+                        <td className="px-3 py-2 text-right text-primary-dark">
+                          {REAL_ZONAS.reduce((acc, z) => {
+                             let v = 0;
+                             if (z.id === 'invitados' || z.id === 'staff') v = dateReservas.filter(r => (r.method || '').toLowerCase() === z.id).length;
+                             else v = dateReservas.filter(r => r.zoneId === z.id || r.zoneName === z.name).length;
+                             return acc + v;
+                          }, 0)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-green-600">
+                          {REAL_ZONAS.reduce((acc, z) => {
+                             let v = 0;
+                             if (z.id === 'invitados' || z.id === 'staff') v = dateReservas.filter(r => (r.method || '').toLowerCase() === z.id).length;
+                             else v = dateReservas.filter(r => r.zoneId === z.id || r.zoneName === z.name).length;
+                             return acc + (z.total - v);
+                          }, 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>

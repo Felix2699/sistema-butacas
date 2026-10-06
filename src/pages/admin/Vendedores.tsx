@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 import { subscribeToVendedores, saveVendedor, deleteVendedor, subscribeToReservas, type Vendedor, type Reserva } from '../../lib/firestore';
 import { clsx } from 'clsx';
@@ -9,7 +9,7 @@ export default function Vendedores() {
   
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', active: true });
-
+  
   useEffect(() => {
     const unsub1 = subscribeToVendedores(setVendedores);
     const unsub2 = subscribeToReservas(setReservas);
@@ -45,6 +45,9 @@ export default function Vendedores() {
     }
   };
 
+  
+  
+  
   const cancelEdit = () => {
     setIsEditing(null);
     setForm({ name: '', active: true });

@@ -699,8 +699,8 @@ export default function Booking() {
                 <label className="block text-xs font-bold text-slate-700 mb-2">
                   Método de Pago <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {['Yape', 'Plin', 'Transferencia'].map(method => (
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {['Yape', 'Plin', 'Efectivo', 'Transferencia'].map(method => (
                     <button
                       key={method}
                       type="button"

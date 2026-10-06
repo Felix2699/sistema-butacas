@@ -10,6 +10,7 @@ const navItems = [
   { to: '/admin/ventas', label: 'Ventas / Pagos', icon: Users, end: false },
   { to: '/admin/vendedores', label: 'Vendedores', icon: Briefcase, end: false },
   { to: '/admin/gastos', label: 'Gastos', icon: Wallet, end: false },
+  { to: '/admin/caja', label: 'Reporte de Caja', icon: Wallet, end: false },
   { to: '/admin/mapa', label: 'Configurar Zonas', icon: Map, end: false },
   { to: '/admin/scanner', label: 'Lector QR', icon: QrCode, end: false },
 ];

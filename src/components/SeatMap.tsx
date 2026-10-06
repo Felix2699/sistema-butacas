@@ -19,7 +19,7 @@ interface SeatMeta {
 
 export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: SeatMapProps) {
   const [activeFloor, setActiveFloor] = useState<1 | 2>(1);
-  const [occupiedSeats, setOccupiedSeats] = useState<{ zoneId: string; seatId: string }[]>([]);
+  const [occupiedSeats, setOccupiedSeats] = useState<{ zoneId: string; seatId: string, method?: string }[]>([]);
 
   useEffect(() => {
     getOccupiedSeats(eventDateId)
@@ -54,7 +54,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
           if (rowLetter === 'A') {
             if (num >= 21) {
               zoneId = 'invitados';
-              special = 'invitados';
+              /* removed */
             } else {
               zoneId = 'iconic';
             }
@@ -66,7 +66,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
           zoneId = 'elite';
           // Staff en esquinas
           if ((rowLetter === 'I' && num === 26) || (rowLetter === 'L' && (num === 26 || num === 14))) {
-            special = 'staff';
+            /* removed */
           }
         }
 
@@ -89,7 +89,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
           if (rowLetter === 'A') {
             if (num <= 6) {
               zoneId = 'invitados';
-              special = 'invitados';
+              /* removed */
             } else {
               zoneId = 'iconic';
             }
@@ -101,7 +101,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
           zoneId = 'elite';
           // Staff en esquinas
           if ((rowLetter === 'I' && (num === 1 || num === 13)) || (rowLetter === 'L' && (num === 1 || num === 13))) {
-            special = 'staff';
+            /* removed */
           }
         }
 
@@ -127,7 +127,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
       for (let c = 1; c <= 6; c++) {
         const seatId = `2P-${rowLetter}L${c}`;
         let special: 'staff' | undefined = undefined;
-        if (rowLetter === 'A' && (c === 5 || c === 6)) special = 'staff';
+        if (rowLetter === 'A' && (c === 5 || c === 6)) /* removed */
         leftSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce', isSpecial: special });
       }
 
@@ -135,7 +135,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
       for (let c = 1; c <= 12; c++) {
         const seatId = `2P-${rowLetter}C${c}`;
         let special: 'staff' | undefined = undefined;
-        if (rowLetter === 'A' && (c === 6 || c === 7)) special = 'staff';
+        if (rowLetter === 'A' && (c === 6 || c === 7)) /* removed */
         centerSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce', isSpecial: special });
       }
 
@@ -143,7 +143,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
       for (let c = 1; c <= 6; c++) {
         const seatId = `2P-${rowLetter}R${c}`;
         let special: 'staff' | undefined = undefined;
-        if (rowLetter === 'A' && (c === 1 || c === 2)) special = 'staff';
+        if (rowLetter === 'A' && (c === 1 || c === 2)) /* removed */
         rightSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce', isSpecial: special });
       }
 
@@ -171,8 +171,15 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
       colorClasses = "bg-slate-900 text-white border-black cursor-not-allowed opacity-90";
     }
 
+    const occupiedInfo = occupiedSeats.find(s => s.seatId === seat.id);
     if (isOccupied) {
-      colorClasses = "bg-slate-300 text-slate-500 border-slate-400 cursor-not-allowed line-through opacity-40";
+      if (occupiedInfo?.method === 'Invitado') {
+        colorClasses = "bg-cyan-500 text-white border-cyan-600 cursor-not-allowed opacity-90";
+      } else if (occupiedInfo?.method === 'Staff') {
+        colorClasses = "bg-slate-900 text-white border-black cursor-not-allowed opacity-90";
+      } else {
+        colorClasses = "bg-slate-300 text-slate-500 border-slate-400 cursor-not-allowed line-through opacity-40";
+      }
     }
 
     if (isSelected) {
@@ -180,7 +187,7 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
     }
 
     const titleText = isOccupied
-      ? `Asiento ${seat.id} (Ocupado)`
+      ? (occupiedInfo?.method === 'Invitado' ? `Asiento ${seat.id} (Reservado Invitados)` : occupiedInfo?.method === 'Staff' ? `Asiento ${seat.id} (Reservado Staff)` : `Asiento ${seat.id} (Ocupado)`)
       : seat.isSpecial === 'invitados'
       ? `Asiento ${seat.id} (Reservado Invitados)`
       : seat.isSpecial === 'staff'
