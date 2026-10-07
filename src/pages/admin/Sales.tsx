@@ -11,7 +11,8 @@ import {
   Receipt,
   DollarSign,
   Edit,
-  Trash2
+  Trash2,
+  ArrowUpDown
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { generateTicketPDF } from '../../lib/pdfGenerator';

@@ -4,7 +4,6 @@ import {
   ArrowDownCircle, 
   Wallet, 
   Search, 
-  Filter, 
   Download,
   Calendar,
   ArrowUpDown
