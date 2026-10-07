@@ -12,7 +12,8 @@ import {
   DollarSign,
   Edit,
   Trash2,
-  ArrowUpDown
+  ArrowUpDown,
+  Upload
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { generateTicketPDF } from '../../lib/pdfGenerator';
@@ -64,6 +65,7 @@ export default function Sales() {
   const [manualAmount, setManualAmount] = useState('');
   const [manualOp, setManualOp] = useState('');
   const [manualMethod, setManualMethod] = useState('Transferencia Caja Piura');
+  const [manualVoucher, setManualVoucher] = useState<string | null>(null);
 
   useEffect(() => {
     getEventDates().then(setEventDates).catch(console.error);
@@ -89,6 +91,7 @@ export default function Sales() {
     setShowAddManualPayment(false);
     setManualAmount('');
     setManualOp('');
+    setManualVoucher(null);
   };
 
   // Toggle verificación de un abono individual
@@ -130,6 +133,15 @@ export default function Sales() {
     setEditablePayments(prev => prev.map(p => ({ ...p, verified: true })));
   };
 
+  // Manejar imagen de voucher en pago manual admin
+  const handleManualVoucherUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setManualVoucher(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
   // Agregar nuevo abono manual en el modal
   const handleAddManualPayment = () => {
     const amountNum = parseFloat(manualAmount);
@@ -143,7 +155,7 @@ export default function Sales() {
       date: new Date().toLocaleString('es-PE'),
       method: manualMethod,
       verified: true, // Manual por admin nace verificado
-      voucherBase64: null,
+      voucherBase64: manualVoucher || null,
       note: 'Registrado directamente por administración'
     };
 
@@ -151,6 +163,7 @@ export default function Sales() {
     setShowAddManualPayment(false);
     setManualAmount('');
     setManualOp('');
+    setManualVoucher(null);
   };
 
   // Guardar y aplicar la sumatoria a Firestore
@@ -682,10 +695,36 @@ export default function Sales() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Captura del comprobante (opcional) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Captura del Comprobante (Opcional)</label>
+                      <label className="block cursor-pointer">
+                        <input type="file" accept="image/*" onChange={handleManualVoucherUpload} className="hidden" />
+                        <div className={`border-2 border-dashed rounded-xl p-3 text-center transition-all ${
+                          manualVoucher ? 'border-green-400 bg-green-50/60' : 'border-slate-300 bg-white hover:border-primary'
+                        }`}>
+                          {manualVoucher ? (
+                            <img src={manualVoucher} alt="Voucher" className="max-h-24 mx-auto rounded-lg object-contain" />
+                          ) : (
+                            <div className="flex items-center justify-center gap-2 py-1">
+                              <Upload size={14} className="text-slate-400" />
+                              <span className="text-[11px] text-slate-500 font-semibold">Adjuntar imagen del pago</span>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                      {manualVoucher && (
+                        <button type="button" onClick={() => setManualVoucher(null)} className="text-[10px] text-red-500 hover:underline mt-1">
+                          ✕ Quitar imagen
+                        </button>
+                      )}
+                    </div>
+
                     <div className="flex justify-end gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={() => setShowAddManualPayment(false)}
+                        onClick={() => { setShowAddManualPayment(false); setManualVoucher(null); }}
                         className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg transition"
                       >
                         Cancelar
