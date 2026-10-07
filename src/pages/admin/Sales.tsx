@@ -50,6 +50,7 @@ export default function Sales() {
   // Modal de edición de datos
   const [editingSale, setEditingSale] = useState<Reserva | null>(null);
   const [editForm, setEditForm] = useState<Partial<Reserva>>({});
+  const [editingTotalPrice, setEditingTotalPrice] = useState<string>('0');
 
   // Modal de gestión de abonos y validación
   const [managingSale, setManagingSale] = useState<Reserva | null>(null);
@@ -62,7 +63,7 @@ export default function Sales() {
   const [showAddManualPayment, setShowAddManualPayment] = useState(false);
   const [manualAmount, setManualAmount] = useState('');
   const [manualOp, setManualOp] = useState('');
-  const [manualMethod, setManualMethod] = useState('Transferencia Bancaria');
+  const [manualMethod, setManualMethod] = useState('Transferencia Caja Piura');
 
   useEffect(() => {
     getEventDates().then(setEventDates).catch(console.error);
@@ -177,12 +178,29 @@ export default function Sales() {
       vendedorId: sale.vendedorId,
       vendedorName: sale.vendedorName
     });
+    setEditingTotalPrice(sale.totalPrice?.toString() || '0');
   };
 
   const handleSaveEdit = async () => {
     if (!editingSale?.id) return;
     try {
-      await updateReservaInfo(editingSale.id, editForm);
+      const newPrice = parseFloat(editingTotalPrice);
+      const dataToSave: Partial<Reserva> = { ...editForm };
+      if (!isNaN(newPrice) && newPrice >= 0) {
+        dataToSave.totalPrice = newPrice;
+        // Recalculate status based on new price
+        const currentPaid = editingSale.totalPaid || 0;
+        if (newPrice === 0) {
+          dataToSave.paymentStatus = 'paid';
+        } else if (currentPaid >= newPrice) {
+          dataToSave.paymentStatus = 'paid';
+        } else if (currentPaid > 0) {
+          dataToSave.paymentStatus = 'partial';
+        } else {
+          dataToSave.paymentStatus = 'pending';
+        }
+      }
+      await updateReservaInfo(editingSale.id, dataToSave);
       setEditingSale(null);
     } catch (err) {
       console.error(err);
@@ -658,7 +676,8 @@ export default function Sales() {
                           <option value="Yape">Yape</option>
                           <option value="Plin">Plin</option>
                           <option value="Efectivo">Efectivo</option>
-                          <option value="Transferencia Bancaria">Transferencia</option>
+                          <option value="Transferencia Caja Piura">Transf. Caja Piura</option>
+                          <option value="Transferencia Interbank">Transf. Interbank</option>
                           <option value="POS / Tarjeta">POS / Tarjeta</option>
                         </select>
                       </div>
@@ -716,7 +735,8 @@ export default function Sales() {
                                 <option value="Yape">Yape</option>
                                 <option value="Plin">Plin</option>
                                 <option value="Efectivo">Efectivo</option>
-                                <option value="Transferencia Bancaria">Transferencia</option>
+                                <option value="Transferencia Caja Piura">Transf. Caja Piura</option>
+                                <option value="Transferencia Interbank">Transf. Interbank</option>
                                 <option value="POS / Tarjeta">POS / Tarjeta</option>
                               </select>
                             </div>
@@ -913,6 +933,21 @@ export default function Sales() {
                   />
                 </div>
               </div>
+
+              {/* ── MODIFICACIÓN POST-VENTA DE PRECIO ── */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <label className="block text-xs font-bold text-amber-700 mb-1 uppercase tracking-wider">⚠️ Modificar Precio de Venta (S/)</label>
+                <p className="text-[11px] text-amber-600 mb-2">Precio original: <strong>S/ {editingSale?.totalPrice?.toFixed(2)}</strong>. El estado de pago se recalculará automáticamente.</p>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  min="0"
+                  value={editingTotalPrice}
+                  onChange={e => setEditingTotalPrice(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-300 text-sm font-black text-slate-900 bg-white outline-none focus:ring-2 focus:ring-amber-300"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Vendedor</label>
                 <select

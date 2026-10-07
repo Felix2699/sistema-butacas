@@ -236,7 +236,9 @@ export default function ReporteCaja() {
           <option value="yape">Yape</option>
           <option value="plin">Plin</option>
           <option value="efectivo">Efectivo</option>
-          <option value="transferencia">Transferencia</option>
+          <option value="Transferencia Caja Piura">Transf. Caja Piura</option>
+          <option value="Transferencia Interbank">Transf. Interbank</option>
+          <option value="pos">POS / Tarjeta</option>
         </select>
       </div>
 
