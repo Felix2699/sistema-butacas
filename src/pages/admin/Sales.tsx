@@ -58,7 +58,7 @@ export default function Sales() {
   const [editablePayments, setEditablePayments] = useState<PaymentRecord[]>([]);
   const [isSavingPayments, setIsSavingPayments] = useState(false);
   const [addInvitadoModal, setAddInvitadoModal] = useState(false);
-  const [invitadoForm, setInvitadoForm] = useState({ fullName: '', dni: '', zoneName: '', seatId: '', type: 'Invitado', eventDateId: '' });
+  const [invitadoForm, setInvitadoForm] = useState({ fullName: '', docType: 'DNI', dni: '', zoneName: '', seatId: '', type: 'Invitado', eventDateId: '' });
 
   // Formulario para nuevo abono manual desde administración
   const [showAddManualPayment, setShowAddManualPayment] = useState(false);
@@ -185,6 +185,7 @@ export default function Sales() {
     setEditingSale(sale);
     setEditForm({
       fullName: sale.fullName,
+      docType: sale.docType || 'DNI',
       dni: sale.dni,
       zoneName: sale.zoneName,
       seatId: sale.seatId,
@@ -223,12 +224,13 @@ export default function Sales() {
 
   // Exportar CSV
   const exportCSV = () => {
-    const headers = ['ID', 'Fecha Evento', 'Modalidad', 'Nombre', 'DNI', 'Email', 'Celular', 'Zona', 'Butaca', 'Total', 'Pagado', 'Abonos', 'Estado'];
+    const headers = ['ID', 'Fecha Evento', 'Modalidad', 'Nombre', 'Tipo Doc', 'Documento', 'Email', 'Celular', 'Zona', 'Butaca', 'Total', 'Pagado', 'Abonos', 'Estado'];
     const rows = sales.map(s => [
       s.id,
       s.eventDateName || 'Día 1',
       s.paymentPlan === 'installments' ? '2 Cuotas' : 'Contado',
       s.fullName,
+      s.docType || 'DNI',
       s.dni,
       s.email,
       s.phone,
@@ -340,7 +342,7 @@ export default function Sales() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o DNI..."
+            placeholder="Buscar por nombre o Documento..."
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm"
           />
         </div>
@@ -384,7 +386,7 @@ export default function Sales() {
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('fullName')}><div className="flex items-center gap-1">Persona <ArrowUpDown size={12}/></div></th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('dni')}><div className="flex items-center gap-1">DNI <ArrowUpDown size={12}/></div></th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('dni')}><div className="flex items-center gap-1">Documento <ArrowUpDown size={12}/></div></th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('zoneName')}><div className="flex items-center gap-1">Zona / Butaca <ArrowUpDown size={12}/></div></th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('paymentStatus')}><div className="flex items-center gap-1">Estado <ArrowUpDown size={12}/></div></th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-200" onClick={() => handleSort('totalPaid')}><div className="flex items-center gap-1">Pagado / Total <ArrowUpDown size={12}/></div></th>
@@ -420,8 +422,11 @@ export default function Sales() {
                     </div>
                   </td>
 
-                  {/* DNI */}
-                  <td className="px-4 py-3 text-slate-500 font-mono">{sale.dni}</td>
+                  {/* Documento */}
+                  <td className="px-4 py-3 text-slate-500 font-mono">
+                    <span className="text-[10px] font-bold text-slate-400 block -mb-1">{sale.docType || 'DNI'}</span>
+                    {sale.dni}
+                  </td>
 
                   {/* Zona / Butaca */}
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
@@ -511,6 +516,7 @@ export default function Sales() {
                             generateTicketPDF({
                               id: sale.id,
                               fullName: sale.fullName,
+                              docType: sale.docType || 'DNI',
                               dni: sale.dni,
                               email: sale.email,
                               phone: sale.phone,
@@ -549,7 +555,7 @@ export default function Sales() {
           {!loading && filtered.length === 0 && (
             <div className="text-center py-16 text-slate-400">
               <p className="text-lg font-medium">Sin resultados</p>
-              <p className="text-sm">Intenta con otro nombre o DNI</p>
+              <p className="text-sm">Intenta con otro nombre o documento</p>
             </div>
           )}
           {loading && (
@@ -575,7 +581,7 @@ export default function Sales() {
                   Gestión y Validación de Abonos
                 </h3>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  {managingSale.fullName} · DNI {managingSale.dni} · {managingSale.zoneName} ({managingSale.seatId || 'General'})
+                  {managingSale.fullName} · {managingSale.docType || 'DNI'} {managingSale.dni} · {managingSale.zoneName} ({managingSale.seatId || 'General'})
                 </p>
               </div>
               <button 
@@ -943,14 +949,28 @@ export default function Sales() {
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">DNI</label>
-                <input 
-                  type="text" 
-                  value={editForm.dni || ''} 
-                  onChange={e => setEditForm({...editForm, dni: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Tipo Doc</label>
+                  <select 
+                    value={editForm.docType || 'DNI'} 
+                    onChange={e => setEditForm({...editForm, docType: e.target.value as any})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                  >
+                    <option value="DNI">DNI</option>
+                    <option value="CE">C. Extranjería</option>
+                    <option value="RUC">RUC</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Documento</label>
+                  <input 
+                    type="text" 
+                    value={editForm.dni || ''} 
+                    onChange={e => setEditForm({...editForm, dni: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1032,9 +1052,21 @@ export default function Sales() {
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">DNI (Para el QR)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Tipo Doc</label>
+                  <select 
+                    value={invitadoForm.docType} 
+                    onChange={e => setInvitadoForm({...invitadoForm, docType: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                  >
+                    <option value="DNI">DNI</option>
+                    <option value="CE">C. Extranjería</option>
+                    <option value="RUC">RUC</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Documento (Para QR)</label>
                   <input 
                     type="text" 
                     value={invitadoForm.dni} 
@@ -1095,6 +1127,7 @@ export default function Sales() {
                 }
                 const dateObj = eventDates.find(d => d.id === invitadoForm.eventDateId);
                 const reservaObj = {
+                  docType: invitadoForm.docType as 'DNI' | 'CE' | 'RUC',
                   fullName: invitadoForm.fullName,
                   dni: invitadoForm.dni,
                   email: '',

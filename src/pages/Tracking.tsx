@@ -25,7 +25,16 @@ const statusConfig = {
   pending: { label: 'Pendiente de Validación', color: 'text-slate-600 bg-slate-100 border-slate-300', icon: AlertCircle },
 };
 
+type DocType = 'DNI' | 'CE' | 'RUC';
+
+const DOC_CONSTRAINTS: Record<DocType, { min: number; max: number; placeholder: string }> = {
+  DNI: { min: 8, max: 8, placeholder: '12345678' },
+  CE: { min: 9, max: 12, placeholder: '123456789' },
+  RUC: { min: 11, max: 11, placeholder: '20123456789' },
+};
+
 export default function TrackingPortal() {
+  const [docType, setDocType] = useState<DocType>('DNI');
   const [dni, setDni] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [ticket, setTicket] = useState<Reserva | null>(null);
@@ -46,8 +55,19 @@ export default function TrackingPortal() {
   // Visor de comprobante
   const [viewVoucherModal, setViewVoucherModal] = useState<string | null>(null);
 
+  const constraints = DOC_CONSTRAINTS[docType];
+
+  const isDocValid = () => dni.length >= constraints.min && dni.length <= constraints.max;
+
   const handleSearch = async () => {
-    if (dni.length !== 8) { setError('El DNI debe tener 8 dígitos'); return; }
+    if (!isDocValid()) {
+      setError(
+        docType === 'DNI' ? 'El DNI debe tener 8 dígitos' :
+        docType === 'CE' ? 'El Carnet de Extranjería debe tener entre 9 y 12 dígitos' :
+        'El RUC debe tener 11 dígitos'
+      );
+      return;
+    }
     setError('');
     setIsSearching(true);
     
@@ -56,7 +76,7 @@ export default function TrackingPortal() {
       if (result) {
         setTicket(result);
       } else {
-        setError('No se encontró ninguna reserva asociada a este DNI.');
+        setError(`No se encontró ninguna reserva asociada a este número de documento.`);
         setTicket(null);
       }
     } catch (err) {
@@ -227,27 +247,48 @@ export default function TrackingPortal() {
       <div className="text-center mb-10">
         <h2 className="text-3xl font-black text-slate-900">Consulta de Entrada y Pagos</h2>
         <p className="text-slate-500 mt-2">
-          Ingresa tu DNI para ver el estado de tu reserva, registrar nuevos abonos y descargar tu entrada oficial una vez pagada al 100%.
+          Ingresa tu número de documento para ver el estado de tu reserva, registrar nuevos abonos y descargar tu entrada oficial una vez pagada al 100%.
         </p>
       </div>
 
       {/* Search Box */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 mb-6">
-        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-          Número de DNI / CE
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 mb-6 space-y-3">
+        {/* Selector de tipo de documento */}
+        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+          Tipo de Documento
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {(['DNI', 'CE', 'RUC'] as DocType[]).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => { setDocType(type); setDni(''); setError(''); }}
+              className={clsx(
+                'py-2 px-2 text-xs font-bold rounded-xl border transition-all text-center',
+                docType === type
+                  ? 'bg-primary/10 border-primary text-primary-dark'
+                  : 'border-slate-200 text-slate-500 hover:border-primary/50'
+              )}
+            >
+              {type === 'CE' ? 'C. Extranjería' : type}
+            </button>
+          ))}
+        </div>
+        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+          Número de {docType === 'CE' ? 'Carnet de Extranjería' : docType}
         </label>
         <div className="flex gap-3">
           <input
             type="text"
             value={dni}
-            onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, constraints.max))}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-lg font-mono tracking-widest font-bold"
-            placeholder="12345678"
+            placeholder={constraints.placeholder}
           />
           <button
             onClick={handleSearch}
-            disabled={isSearching || dni.length !== 8}
+            disabled={isSearching || !isDocValid()}
             className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-bold rounded-2xl transition flex items-center gap-2 disabled:bg-slate-400 shrink-0 shadow-md shadow-primary/20"
           >
             {isSearching ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
@@ -296,7 +337,7 @@ export default function TrackingPortal() {
               <p className="font-bold text-slate-900 mt-0.5 text-sm">{ticket.fullName}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400 font-bold uppercase">DNI</p>
+              <p className="text-xs text-slate-400 font-bold uppercase">{ticket.docType || 'DNI'}</p>
               <p className="font-bold text-slate-900 font-mono mt-0.5 text-sm">{ticket.dni}</p>
             </div>
             <div>

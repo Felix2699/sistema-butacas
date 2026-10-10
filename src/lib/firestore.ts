@@ -42,8 +42,9 @@ export interface PaymentRecord {
 
 export interface Reserva {
   id?: string;
+  docType?: 'DNI' | 'CE' | 'RUC'; // Tipo de documento
   fullName: string;
-  dni: string;
+  dni: string; // Número de documento (puede ser DNI, CE o RUC)
   email: string;
   phone: string;
   certificateName?: string;

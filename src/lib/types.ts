@@ -20,9 +20,12 @@ export interface Zone {
   }[];
 }
 
+export type DocumentType = 'DNI' | 'CE' | 'RUC';
+
 export interface User {
   id: string;
-  dni: string;
+  docType: DocumentType;
+  dni: string;  // Número de documento (DNI, CE o RUC)
   fullName: string;
   email: string;
   phone: string;

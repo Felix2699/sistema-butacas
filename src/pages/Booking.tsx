@@ -31,9 +31,18 @@ import {
   DEFAULT_EVENT_DATES 
 } from '../lib/constants';
 
+type DocType = 'DNI' | 'CE' | 'RUC';
+
+const DOC_TYPE_CONFIG: Record<DocType, { label: string; placeholder: string; minLen: number; maxLen: number; numericOnly: boolean }> = {
+  DNI: { label: 'DNI', placeholder: '8 dígitos', minLen: 8, maxLen: 8, numericOnly: true },
+  CE: { label: 'Carnet de Extranjería', placeholder: '9 a 12 dígitos', minLen: 9, maxLen: 12, numericOnly: true },
+  RUC: { label: 'RUC', placeholder: '11 dígitos', minLen: 11, maxLen: 11, numericOnly: true },
+};
+
 interface FormData {
+  docType: DocType;
   fullName: string;
-  dni: string;
+  dni: string; // Número de documento
   email: string;
   phone: string;
   certificateName: string;
@@ -43,6 +52,7 @@ interface FormData {
 }
 
 const initialForm: FormData = {
+  docType: 'DNI',
   fullName: '',
   dni: '',
   email: '',
@@ -175,7 +185,15 @@ export default function Booking() {
     }
   };
 
+  const docConfig = DOC_TYPE_CONFIG[form.docType];
+
+  const isDocNumberValid = () => {
+    const len = form.dni.length;
+    return len >= docConfig.minLen && len <= docConfig.maxLen;
+  };
+
   const handleSearchDni = async () => {
+    if (form.docType !== 'DNI') return; // Solo aplica búsqueda automática para DNI
     if (form.dni.length !== 8) {
       setDniError('El DNI debe tener 8 dígitos');
       return;
@@ -288,7 +306,7 @@ export default function Booking() {
       selectedEventDateId &&
       selectedZone &&
       form.fullName.trim() &&
-      form.dni.length === 8 &&
+      isDocNumberValid() &&
       form.email.includes('@') &&
       form.phone.length >= 9 &&
       operationNumber.trim() &&
@@ -312,6 +330,7 @@ export default function Booking() {
       const newQrCode = `EVT-2026-${selectedEventDateId}-${form.dni.trim()}-${selectedSeat || 'GEN'}`;
       
       const docRef = await addDoc(collection(db, 'reservas'), {
+        docType: form.docType,
         fullName: form.fullName.trim().toUpperCase(),
         dni: form.dni.trim(),
         email: form.email.trim().toLowerCase(),
@@ -376,7 +395,7 @@ export default function Booking() {
               <span className="font-bold text-slate-900">{form.fullName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">DNI:</span>
+              <span className="text-slate-500">{form.docType}:</span>
               <span className="font-mono font-bold text-slate-900">{form.dni}</span>
             </div>
             <div className="flex justify-between">
@@ -600,34 +619,67 @@ export default function Booking() {
 
             {/* Form Fields */}
             <div className="space-y-4">
-              {/* DNI */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  DNI / CE <span className="text-red-500">*</span>
+              {/* Tipo de Documento + Número */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Tipo y Número de Documento <span className="text-red-500">*</span>
                 </label>
+                {/* Selector de tipo */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['DNI', 'CE', 'RUC'] as DocType[]).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, docType: type, dni: '' }));
+                        setDniFetched(false);
+                        setDniError('');
+                      }}
+                      className={clsx(
+                        'py-2 px-1 text-xs font-bold rounded-xl border transition-all text-center',
+                        form.docType === type
+                          ? 'bg-primary/10 border-primary text-primary-dark'
+                          : 'border-slate-200 text-slate-500 hover:border-primary/50'
+                      )}
+                    >
+                      {type === 'CE' ? 'C. Extranjería' : type}
+                    </button>
+                  ))}
+                </div>
+                {/* Input de número de documento */}
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    maxLength={8}
+                    maxLength={docConfig.maxLen}
                     value={form.dni}
                     onChange={(e) => {
-                      setField('dni', e.target.value.replace(/\D/g, ''));
+                      const val = docConfig.numericOnly
+                        ? e.target.value.replace(/\D/g, '')
+                        : e.target.value;
+                      setField('dni', val);
                       setDniFetched(false);
                     }}
-                    placeholder="8 dígitos"
+                    placeholder={docConfig.placeholder}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm font-mono"
                   />
-                  <button
-                    type="button"
-                    disabled={form.dni.length !== 8 || isSearchingDni}
-                    onClick={handleSearchDni}
-                    className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition"
-                  >
-                    {isSearchingDni ? <Loader2 size={14} className="animate-spin" /> : 'Validar'}
-                  </button>
+                  {form.docType === 'DNI' && (
+                    <button
+                      type="button"
+                      disabled={form.dni.length !== 8 || isSearchingDni}
+                      onClick={handleSearchDni}
+                      className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 disabled:opacity-50 transition"
+                    >
+                      {isSearchingDni ? <Loader2 size={14} className="animate-spin" /> : 'Validar'}
+                    </button>
+                  )}
                 </div>
-                {dniError && <p className="text-xs text-red-500 mt-1">{dniError}</p>}
-                {dniFetched && <p className="text-xs text-green-600 mt-1">✅ Nombre autocompletado con éxito</p>}
+                {form.docType !== 'DNI' && (
+                  <p className="text-[11px] text-slate-400">
+                    {form.docType === 'CE' ? 'Carnet de Extranjería: ingresa entre 9 y 12 dígitos.' : 'RUC: ingresa los 11 dígitos.'}
+                  </p>
+                )}
+                {dniError && <p className="text-xs text-red-500">{dniError}</p>}
+                {dniFetched && <p className="text-xs text-green-600">✅ Nombre autocompletado con éxito</p>}
               </div>
 
               {/* Nombres y Apellidos */}

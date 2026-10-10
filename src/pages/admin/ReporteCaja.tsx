@@ -56,7 +56,7 @@ export default function ReporteCaja() {
                 id: `ing-${r.id}-${idx}`,
                 type: 'ingreso',
                 date: p.date,
-                description: `Abono Reserva: ${r.fullName} (${r.dni})`,
+                description: `Abono Reserva: ${r.fullName} (${r.docType || 'DNI'} ${r.dni})`,
                 method: p.method || 'Efectivo',
                 amount: p.amount,
                 timestamp: ts // We'll just sort them roughly or keep as they appear
