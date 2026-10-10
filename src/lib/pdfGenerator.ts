@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 export interface TicketData {
   id: string;
   fullName: string;
+  docType?: 'DNI' | 'CE' | 'RUC' | string;
   dni: string;
   email: string;
   phone: string;
@@ -68,7 +69,7 @@ export async function generateTicketPDF(ticket: TicketData) {
     addDetail('FECHA FUNCIÓN:', ticket.eventDateName);
   }
   addDetail('ASISTENTE:', ticket.fullName);
-  addDetail('DNI / CE:', ticket.dni);
+  addDetail(`${ticket.docType || 'DNI'}:`, ticket.dni);
   addDetail('CELULAR:', ticket.phone);
   addDetail('CERTIFICADO:', ticket.certificateName || ticket.fullName);
   addDetail('ZONA:', ticket.zoneName);

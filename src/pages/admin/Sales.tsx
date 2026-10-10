@@ -1156,7 +1156,7 @@ export default function Sales() {
                 try {
                   await createReserva(reservaObj as any, invitadoForm.dni + '-' + Date.now().toString().slice(-4));
                   setAddInvitadoModal(false);
-                  setInvitadoForm({ fullName: '', dni: '', zoneName: '', seatId: '', type: 'Invitado', eventDateId: '' });
+                  setInvitadoForm({ fullName: '', docType: 'DNI', dni: '', zoneName: '', seatId: '', type: 'Invitado', eventDateId: '' });
                 } catch(e) {
                   console.error(e);
                   alert('Error al registrar');
