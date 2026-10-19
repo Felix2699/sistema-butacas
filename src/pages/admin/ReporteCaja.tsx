@@ -24,6 +24,7 @@ interface Transaction {
   method: string;
   amount: number;
   timestamp: number;
+  editReason?: string;
 }
 
 export default function ReporteCaja() {
@@ -51,15 +52,16 @@ export default function ReporteCaja() {
             if (p.verified) {
               // Extract timestamp from date string or fallback
               let ts = Date.now();
-              // p.date is something like "13/09/2026, 16:30" or similar
+              const editTag = r.editReason ? ` [Modif: ${r.editReason}]` : '';
               trans.push({
                 id: `ing-${r.id}-${idx}`,
                 type: 'ingreso',
                 date: p.date,
-                description: `Abono Reserva: ${r.fullName} (${r.docType || 'DNI'} ${r.dni})`,
+                description: `Abono Reserva: ${r.fullName} (${r.docType || 'DNI'} ${r.dni})${editTag}`,
                 method: p.method || 'Efectivo',
                 amount: p.amount,
-                timestamp: ts // We'll just sort them roughly or keep as they appear
+                timestamp: ts,
+                editReason: r.editReason || ''
               });
             }
           });
@@ -145,19 +147,20 @@ export default function ReporteCaja() {
   const balance = totalIngresos - totalEgresos;
 
   const exportCSV = () => {
-    const headers = ['Tipo', 'Fecha', 'Descripcion', 'Metodo', 'Monto'];
+    const headers = ['Tipo', 'Fecha', 'Descripcion', 'Metodo', 'Monto (S/)', 'Motivo Modificacion Entrada'];
     const rows = filtered.map(t => [
       t.type.toUpperCase(),
-      t.date,
-      t.description.replace(/,/g, ''), // remove commas for safe CSV
-      t.method,
-      t.amount.toFixed(2)
+      `"${t.date}"`,
+      `"${t.description.replace(/"/g, '""')}"`,
+      `"${t.method}"`,
+      t.amount.toFixed(2),
+      `"${(t.editReason || '—').replace(/"/g, '""')}"`
     ]);
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\\n');
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "reporte_caja_fluctuante.csv";
+    link.download = `reporte_caja_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
@@ -282,7 +285,16 @@ export default function ReporteCaja() {
                       <Calendar size={12} /> {t.date}
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-800 whitespace-normal min-w-[200px]">
-                      {t.description}
+                      <div>
+                        <span>{t.description}</span>
+                        {t.editReason && (
+                          <div className="mt-0.5">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">
+                              ✏️ Modif: {t.editReason}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-[10px] uppercase font-black tracking-wider text-slate-500 bg-slate-100 px-2 py-1 rounded-md">

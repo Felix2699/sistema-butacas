@@ -40,19 +40,15 @@ Para que la aplicación funcione correctamente, debes configurar los siguientes 
    - Colección `zonas` (Almacena la configuración del mapa)
 3. **Storage:** (Opcional pero recomendado en el Plan Blaze) para almacenar las imágenes de los comprobantes de pago subidos por los clientes.
 
-### Reglas de Seguridad Básicas (Firestore)
+### Reglas de Seguridad Operativas (Firestore)
 ```text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /reservas/{reservaId} {
-      allow read: if true; // Para tracking
-      allow write: if true; // Para nueva reserva pública (puedes restringir con más reglas según IP/captcha en prod)
-      allow update: if request.auth != null; // Admin
-    }
-    match /zonas/{zonaId} {
-      allow read: if true;
-      allow write, update, delete: if request.auth != null; // Admin
+    // Permitir lectura y escritura completa para que la plataforma web pueda guardar,
+    // editar ventas, registrar pagos, abonos, gastos y gestionar butacas sin bloqueos
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

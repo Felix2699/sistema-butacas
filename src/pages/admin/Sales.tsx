@@ -52,6 +52,8 @@ export default function Sales() {
   const [editingSale, setEditingSale] = useState<Reserva | null>(null);
   const [editForm, setEditForm] = useState<Partial<Reserva>>({});
   const [editingTotalPrice, setEditingTotalPrice] = useState<string>('0');
+  const [reasonCategory, setReasonCategory] = useState<string>('');
+  const [reasonCustomText, setReasonCustomText] = useState<string>('');
 
   // Modal de gestión de abonos y validación
   const [managingSale, setManagingSale] = useState<Reserva | null>(null);
@@ -181,6 +183,15 @@ export default function Sales() {
     }
   };
 
+  const standardReasonOptions = [
+    'Cambio de Butaca', 
+    'Corrección de Datos', 
+    'Cambio de Titular', 
+    'Ajuste de Precio', 
+    'Descuento Autorizado',
+    'Error de Tipeo'
+  ];
+
   const handleOpenEdit = (sale: Reserva) => {
     setEditingSale(sale);
     setEditForm({
@@ -190,16 +201,58 @@ export default function Sales() {
       zoneName: sale.zoneName,
       seatId: sale.seatId,
       vendedorId: sale.vendedorId,
-      vendedorName: sale.vendedorName
+      vendedorName: sale.vendedorName,
+      editReason: sale.editReason || ''
     });
     setEditingTotalPrice(sale.totalPrice?.toString() || '0');
+
+    const existing = (sale.editReason || '').trim();
+    if (!existing) {
+      setReasonCategory('');
+      setReasonCustomText('');
+    } else if (standardReasonOptions.includes(existing)) {
+      setReasonCategory(existing);
+      setReasonCustomText('');
+    } else {
+      const match = existing.match(/^([^(]+)\s*\((.+)\)$/);
+      if (match && standardReasonOptions.includes(match[1].trim())) {
+        setReasonCategory(match[1].trim());
+        setReasonCustomText(match[2].trim());
+      } else if (existing.startsWith('Otro: ')) {
+        setReasonCategory('Otro');
+        setReasonCustomText(existing.slice(6).trim());
+      } else {
+        setReasonCategory('Otro');
+        setReasonCustomText(existing);
+      }
+    }
   };
 
   const handleSaveEdit = async () => {
     if (!editingSale?.id) return;
+    if (!reasonCategory) {
+      alert('Por favor selecciona o indica un motivo para la edición.');
+      return;
+    }
+    let finalReason = reasonCategory;
+    if (reasonCategory === 'Otro') {
+      if (!reasonCustomText.trim()) {
+        alert('Por favor coloca el motivo de la edición.');
+        return;
+      }
+      finalReason = `Otro: ${reasonCustomText.trim()}`;
+    } else if (reasonCustomText.trim()) {
+      finalReason = `${reasonCategory} (${reasonCustomText.trim()})`;
+    }
+
     try {
       const newPrice = parseFloat(editingTotalPrice);
-      const dataToSave: Partial<Reserva> = { ...editForm };
+      const dataToSave: Partial<Reserva> = { 
+        ...editForm,
+        editReason: finalReason,
+        editedAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+        editedBy: 'Administración'
+      };
       if (!isNaN(newPrice) && newPrice >= 0) {
         dataToSave.totalPrice = newPrice;
         // Recalculate status based on new price
@@ -224,33 +277,66 @@ export default function Sales() {
 
   // Exportar CSV
   const exportCSV = () => {
-    const headers = ['ID', 'Fecha Evento', 'Modalidad', 'Nombre', 'Tipo Doc', 'Documento', 'Email', 'Celular', 'Zona', 'Butaca', 'Total', 'Pagado', 'Abonos', 'Estado'];
-    const rows = sales.map(s => [
-      s.id,
-      s.eventDateName || 'Día 1',
-      s.paymentPlan === 'installments' ? '2 Cuotas' : 'Contado',
-      s.fullName,
-      s.docType || 'DNI',
-      s.dni,
-      s.email,
-      s.phone,
-      s.zoneName,
-      s.seatId || 'GEN',
-      s.totalPrice,
-      s.totalPaid,
-      s.payments?.length || 0,
-      s.paymentStatus
-    ]);
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const headers = [
+      'ID', 
+      'Fecha Evento', 
+      'Modalidad', 
+      'Nombre', 
+      'Tipo Doc', 
+      'Documento', 
+      'Email', 
+      'Celular', 
+      'Zona', 
+      'Butaca', 
+      'Total (S/)', 
+      'Pagado (S/)', 
+      'Saldo Pendiente (S/)',
+      'Nro Abonos', 
+      'Estado Pago', 
+      'Vendedor', 
+      'Fecha Registro', 
+      'Motivo Edición', 
+      'Fecha Última Edición'
+    ];
+    const rows = sales.map(s => {
+      const saldo = Math.max(0, (s.totalPrice || 0) - (s.totalPaid || 0));
+      const regDate = s.createdAt && (s.createdAt as any).toDate 
+        ? (s.createdAt as any).toDate().toLocaleString('es-PE') 
+        : '—';
+      return [
+        s.id,
+        `"${s.eventDateName || 'Día 1'}"`,
+        s.paymentPlan === 'installments' ? '2 Cuotas' : 'Contado',
+        `"${(s.fullName || '').replace(/"/g, '""')}"`,
+        s.docType || 'DNI',
+        `\t${s.dni || ''}`,
+        `"${(s.email || '').replace(/"/g, '""')}"`,
+        `\t${s.phone || ''}`,
+        `"${(s.zoneName || '').replace(/"/g, '""')}"`,
+        s.seatId || 'GEN',
+        s.totalPrice,
+        s.totalPaid,
+        saldo.toFixed(2),
+        s.payments?.length || 0,
+        s.paymentStatus,
+        `"${(s.vendedorName || 'Sin Vendedor').replace(/"/g, '""')}"`,
+        `"${regDate}"`,
+        `"${(s.editReason || 'Sin modificaciones').replace(/"/g, '""')}"`,
+        `"${s.editedAt || '—'}"`
+      ];
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "ventas_butacas.csv";
+    link.download = `reporte_ventas_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
   const filtered = sales.filter(s => {
-    const matchSearch = s.fullName.toLowerCase().includes(search.toLowerCase()) || s.dni.includes(search);
+    const matchSearch = s.fullName.toLowerCase().includes(search.toLowerCase()) || 
+      s.dni.includes(search) ||
+      (s.editReason && s.editReason.toLowerCase().includes(search.toLowerCase()));
     const matchFilter = filter === 'all' || s.paymentStatus === filter;
     const matchDate = filterDate === 'all' || s.eventDateId === filterDate || (!s.eventDateId && filterDate === 'd1');
     return matchSearch && matchFilter && matchDate;
@@ -410,13 +496,21 @@ export default function Sales() {
                   {/* Persona */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <p className="font-bold text-slate-900">{sale.fullName}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
                         {sale.eventDateName?.split('(')[0]?.trim() || 'Día 1'}
                       </span>
                       {sale.paymentPlan === 'installments' && (
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">
                           2 Cuotas
+                        </span>
+                      )}
+                      {sale.editReason && (
+                        <span 
+                          title={`Motivo de edición: ${sale.editReason}${sale.editedAt ? ` (${sale.editedAt})` : ''}`}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md cursor-help"
+                        >
+                          ✏️ Modif: {sale.editReason}
                         </span>
                       )}
                     </div>
@@ -593,6 +687,22 @@ export default function Sales() {
             </div>
 
             <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              {/* Notificación si la entrada tiene modificaciones previas */}
+              {managingSale.editReason && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex items-start gap-2.5 text-xs text-blue-900">
+                  <div className="p-1 bg-blue-100 rounded-lg text-blue-700 shrink-0">
+                    <Edit size={14} />
+                  </div>
+                  <div>
+                    <p className="font-bold">Historial de Modificación de Entrada:</p>
+                    <p className="text-blue-800 mt-0.5">{managingSale.editReason}</p>
+                    {managingSale.editedAt && (
+                      <p className="text-[11px] text-blue-600 mt-0.5 font-medium">Fecha de cambio: {managingSale.editedAt}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Tarjetas de Resumen Financiero en Tiempo Real */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl text-center">
@@ -1020,6 +1130,108 @@ export default function Sales() {
                   <option value="">Sin Vendedor (Cliente Web)</option>
                   {vendedores.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                 </select>
+              </div>
+
+              {/* ── MOTIVO DE LA EDICIÓN (AUDITORÍA Y REPORTES) ── */}
+              <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                    📝 Motivo de la Edición <span className="text-red-500 font-bold">*</span>
+                  </label>
+                  <span className="text-[10px] text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded-md">
+                    Saldrá en los reportes
+                  </span>
+                </div>
+
+                {/* Selector de Motivo con opción 'Otro' */}
+                <div>
+                  <select
+                    value={reasonCategory}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setReasonCategory(val);
+                      if (val !== 'Otro') {
+                        setReasonCustomText('');
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-blue-200 text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white font-medium text-slate-800"
+                  >
+                    <option value="">-- Selecciona el motivo --</option>
+                    <option value="Cambio de Butaca">Cambio de Butaca</option>
+                    <option value="Corrección de Datos">Corrección de Datos</option>
+                    <option value="Cambio de Titular">Cambio de Titular</option>
+                    <option value="Ajuste de Precio">Ajuste de Precio</option>
+                    <option value="Descuento Autorizado">Descuento Autorizado</option>
+                    <option value="Error de Tipeo">Error de Tipeo</option>
+                    <option value="Otro">Otro (Colocar motivo manual)</option>
+                  </select>
+                </div>
+
+                {/* Si elige 'Otro', campo obligatorio para colocar el motivo */}
+                {reasonCategory === 'Otro' && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-blue-950">
+                      Coloca el motivo de la edición <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={reasonCustomText}
+                      onChange={e => setReasonCustomText(e.target.value)}
+                      placeholder="Escribe aquí el motivo detallado de la modificación..."
+                      className="w-full px-3 py-2 rounded-xl border border-blue-300 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none text-slate-800 placeholder:text-slate-400 shadow-2xs"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* Si elige un motivo estándar, campo opcional para notas */}
+                {reasonCategory !== '' && reasonCategory !== 'Otro' && (
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-semibold text-blue-800">
+                      Detalle adicional (opcional):
+                    </label>
+                    <input
+                      type="text"
+                      value={reasonCustomText}
+                      onChange={e => setReasonCustomText(e.target.value)}
+                      placeholder="Ej: De butaca A12 a B15 / Autorizado por gerencia..."
+                      className="w-full px-3 py-1.5 rounded-xl border border-blue-200 text-xs outline-none focus:ring-2 focus:ring-blue-400 bg-white text-slate-800 placeholder:text-slate-400"
+                    />
+                  </div>
+                )}
+
+                {/* Botones de selección rápida incluyendo 'Otro' */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  <span className="text-[10px] text-blue-700 font-semibold self-center">Opciones rápidas:</span>
+                  {[
+                    'Cambio de Butaca', 
+                    'Corrección de Datos', 
+                    'Cambio de Titular', 
+                    'Ajuste de Precio', 
+                    'Descuento Autorizado',
+                    'Otro'
+                  ].map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        setReasonCategory(opt);
+                        if (opt !== 'Otro') {
+                          setReasonCustomText('');
+                        }
+                      }}
+                      className={clsx(
+                        "text-[10px] px-2.5 py-1 rounded-lg font-medium transition shadow-2xs border",
+                        reasonCategory === opt 
+                          ? 'bg-blue-600 text-white border-blue-600 font-bold' 
+                          : 'bg-white hover:bg-blue-100 text-blue-800 border-blue-200'
+                      )}
+                    >
+                      {opt === 'Otro' ? '✏️ Otro' : opt}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
