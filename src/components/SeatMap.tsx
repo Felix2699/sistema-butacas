@@ -33,8 +33,8 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
   };
 
   // Helper para generar asientos del Primer Piso
-  // Fila A a H (Zona Iconic, Glam, Invitados)
-  // Filas posteriores I a N (Zona Élite y Staff)
+  // Fila A a H (Zona Iconic y Glam)
+  // Filas posteriores I a L (Zona Élite)
   const getFloor1Seats = () => {
     const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
     
@@ -48,67 +48,68 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
       for (let num = 26; num >= 14; num--) {
         const seatId = `${rowLetter}${num}`;
         let zoneId = 'glam';
-        let special: 'invitados' | 'staff' | undefined = undefined;
 
-        if (!isEliteBlock) {
-          if (rowLetter === 'A') {
-            if (num >= 21) {
-              zoneId = 'invitados';
-              /* removed */
-            } else {
-              zoneId = 'iconic';
-            }
-          } else if (rowLetter === 'B') {
-            if (num <= 20) zoneId = 'iconic';
-            else zoneId = 'glam';
-          }
-        } else {
-          zoneId = 'elite';
-          // Staff en esquinas
-          if ((rowLetter === 'I' && num === 26) || (rowLetter === 'L' && (num === 26 || num === 14))) {
-            /* removed */
-          }
+        // Ajuste de forma del teatro:
+        // Filas A, B, C: no tienen 25 ni 26 (inician en 24)
+        if (['A', 'B', 'C'].includes(rowLetter) && num >= 25) {
+          continue;
         }
-
-        // Ajuste de forma: fila A y C no tienen 25-26
-        if ((rowLetter === 'A' || rowLetter === 'B' || rowLetter === 'C') && num >= 25) {
-          // Espacio vacío
+        // Filas D, E, F: no tienen 26 (inician en 25)
+        if (['D', 'E', 'F'].includes(rowLetter) && num === 26) {
           continue;
         }
 
-        leftSeats.push({ id: seatId, label: String(num), zoneId, isSpecial: special });
+        if (!isEliteBlock) {
+          // Filas A y B: asientos 14 a 20 son ICONIC, 21 a 24 son GLAM
+          if (['A', 'B'].includes(rowLetter)) {
+            if (num <= 20) {
+              zoneId = 'iconic';
+            } else {
+              zoneId = 'glam';
+            }
+          } else {
+            // Filas C a H son GLAM
+            zoneId = 'glam';
+          }
+        } else {
+          zoneId = 'elite';
+        }
+
+        leftSeats.push({ id: seatId, label: String(num), zoneId });
       }
 
       // Números lado derecho: 13 bajando a 1
       for (let num = 13; num >= 1; num--) {
         const seatId = `${rowLetter}${num}`;
         let zoneId = 'glam';
-        let special: 'invitados' | 'staff' | undefined = undefined;
+
+        // Ajuste de forma del teatro:
+        // Filas A, B, C: no tienen 1 ni 2 (inician en 3)
+        if (['A', 'B', 'C'].includes(rowLetter) && num <= 2) {
+          continue;
+        }
+        // Filas D, E, F: no tienen 1 (inician en 2)
+        if (['D', 'E', 'F'].includes(rowLetter) && num === 1) {
+          continue;
+        }
 
         if (!isEliteBlock) {
-          if (rowLetter === 'A') {
-            if (num <= 6) {
-              zoneId = 'invitados';
-              /* removed */
-            } else {
+          // Filas A y B: asientos 7 a 13 son ICONIC, 3 a 6 son GLAM
+          if (['A', 'B'].includes(rowLetter)) {
+            if (num >= 7) {
               zoneId = 'iconic';
+            } else {
+              zoneId = 'glam';
             }
-          } else if (rowLetter === 'B') {
-            if (num >= 7) zoneId = 'iconic';
-            else zoneId = 'glam';
+          } else {
+            // Filas C a H son GLAM
+            zoneId = 'glam';
           }
         } else {
           zoneId = 'elite';
-          // Staff en esquinas
-          if ((rowLetter === 'I' && (num === 1 || num === 13)) || (rowLetter === 'L' && (num === 1 || num === 13))) {
-            /* removed */
-          }
         }
 
-        // Ajuste de forma: fila A, B no tienen 1-2
-        if (rowLetter === 'A' && num <= 0) continue;
-
-        rightSeats.push({ id: seatId, label: String(num), zoneId, isSpecial: special });
+        rightSeats.push({ id: seatId, label: String(num), zoneId });
       }
 
       return { rowLetter, isEliteBlock, leftSeats, rightSeats };
@@ -126,25 +127,19 @@ export default function SeatMap({ onSelectSeat, eventDateId, selectedSeat }: Sea
       // Lateral Izquierdo: col 1 a 6
       for (let c = 1; c <= 6; c++) {
         const seatId = `2P-${rowLetter}L${c}`;
-        let special: 'staff' | undefined = undefined;
-        if (rowLetter === 'A' && (c === 5 || c === 6)) /* removed */
-        leftSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce', isSpecial: special });
+        leftSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce' });
       }
 
       // Centro: col 1 a 12
       for (let c = 1; c <= 12; c++) {
         const seatId = `2P-${rowLetter}C${c}`;
-        let special: 'staff' | undefined = undefined;
-        if (rowLetter === 'A' && (c === 6 || c === 7)) /* removed */
-        centerSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce', isSpecial: special });
+        centerSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce' });
       }
 
       // Lateral Derecho: col 1 a 6
       for (let c = 1; c <= 6; c++) {
         const seatId = `2P-${rowLetter}R${c}`;
-        let special: 'staff' | undefined = undefined;
-        if (rowLetter === 'A' && (c === 1 || c === 2)) /* removed */
-        rightSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce', isSpecial: special });
+        rightSeats.push({ id: seatId, label: `${c}`, zoneId: 'bronce' });
       }
 
       return { rowLetter, leftSeats, centerSeats, rightSeats };

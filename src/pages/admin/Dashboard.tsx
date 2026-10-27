@@ -11,8 +11,8 @@ import {
 
 // ─── Capacidades reales por zona ─────────────────────────────────────────────
 const REAL_ZONAS = [
-  { id: 'iconic',    name: 'ICONIC',    total: 26,  color: '#ef4444' },
-  { id: 'glam',      name: 'GLAM',      total: 154, color: '#eab308' },
+  { id: 'iconic',    name: 'ICONIC',    total: 28,  color: '#ef4444' },
+  { id: 'glam',      name: 'GLAM',      total: 162, color: '#eab308' },
   { id: 'elite',     name: 'ÉLITE',     total: 104, color: '#fb7185' },
   { id: 'bronce',    name: 'BRONCE',    total: 358, color: '#d97706' },
   { id: 'invitados', name: 'INVITADOS', total: 20,  color: '#06b6d4' },

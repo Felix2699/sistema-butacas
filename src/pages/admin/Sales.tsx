@@ -13,7 +13,8 @@ import {
   Edit,
   Trash2,
   ArrowUpDown,
-  Upload
+  Upload,
+  Lock
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { generateTicketPDF } from '../../lib/pdfGenerator';
@@ -22,6 +23,7 @@ import {
   createReserva, 
   updateReservaPaymentsAndTotal,
   updateReservaInfo,
+  deleteReserva,
   subscribeToVendedores,
   getEventDates,
   type Reserva, 
@@ -29,6 +31,18 @@ import {
   type PaymentRecord,
   type Vendedor
 } from '../../lib/firestore';
+
+// Hash criptográfico SHA-256 de la contraseña de autorización para eliminar ventas
+const DELETE_AUTH_HASH = 'd3cb1d7159d756f573c9476f2d49f849615a14b2bcfebfb973d7b462949b0565';
+
+async function verifyDeletePassword(password: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password.trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex === DELETE_AUTH_HASH;
+}
 
 const statusBadge = {
   paid: 'bg-green-100 text-green-700 border border-green-300',
@@ -68,6 +82,12 @@ export default function Sales() {
   const [manualOp, setManualOp] = useState('');
   const [manualMethod, setManualMethod] = useState('Transferencia Caja Piura');
   const [manualVoucher, setManualVoucher] = useState<string | null>(null);
+
+  // Modal de eliminación segura de venta con contraseña
+  const [deletingSale, setDeletingSale] = useState<Reserva | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     getEventDates().then(setEventDates).catch(console.error);
@@ -174,12 +194,42 @@ export default function Sales() {
     setIsSavingPayments(true);
     try {
       await updateReservaPaymentsAndTotal(managingSale.id, editablePayments, managingSale.totalPrice);
+      setIsSavingPayments(false);
       setManagingSale(null);
     } catch (err) {
       console.error('Error al actualizar pagos:', err);
       alert('Hubo un error al guardar los pagos.');
-    } finally {
       setIsSavingPayments(false);
+    }
+  };
+
+  // Confirmar eliminación segura de una reserva con contraseña
+  const handleConfirmDelete = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!deletingSale?.id) return;
+
+    if (!deletePassword.trim()) {
+      setDeleteError('Por favor ingresa la contraseña de autorización.');
+      return;
+    }
+
+    const isValid = await verifyDeletePassword(deletePassword);
+    if (!isValid) {
+      setDeleteError('Contraseña incorrecta. No estás autorizado para eliminar ventas.');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteReserva(deletingSale.id);
+      setDeletingSale(null);
+      setDeletePassword('');
+      setDeleteError('');
+    } catch (err) {
+      console.error('Error al eliminar venta:', err);
+      setDeleteError('Error al eliminar la venta. Intenta nuevamente.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -639,6 +689,19 @@ export default function Sales() {
                       >
                         <Edit size={16} />
                       </button>
+
+                      {/* Eliminar Venta */}
+                      <button
+                        title="Eliminar Venta / Reserva (Requiere Contraseña)"
+                        onClick={() => {
+                          setDeletingSale(sale);
+                          setDeletePassword('');
+                          setDeleteError('');
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-red-100 text-red-600 transition"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -731,11 +794,11 @@ export default function Sales() {
                   ? 'bg-amber-50 border-amber-300 text-amber-800'
                   : 'bg-slate-100 border-slate-300 text-slate-700'
               }`}>
-                <span>
-                  {modalNewStatus === 'paid' && '🎉 Al guardar, la entrada quedará marcada como PAGADA y el cliente podrá descargar su boleto con QR oficial.'}
-                  {modalNewStatus === 'partial' && `⚠️ Pago Parcial: el cliente registra abonos pero aún le falta cancelar S/ ${modalSaldoPendiente.toFixed(2)}. El QR se mantiene bloqueado hasta el 100%.`}
-                  {modalNewStatus === 'pending' && '🕐 Sin abonos verificados: la entrada se mantiene en estado PENDIENTE.'}
-                </span>
+                <div>
+                  {modalNewStatus === 'paid' && <span>🎉 Al guardar, la entrada quedará marcada como PAGADA y el cliente podrá descargar su boleto con QR oficial.</span>}
+                  {modalNewStatus === 'partial' && <span>⚠️ Pago Parcial: el cliente registra abonos pero aún le falta cancelar S/ {modalSaldoPendiente.toFixed(2)}. El QR se mantiene bloqueado hasta el 100%.</span>}
+                  {modalNewStatus === 'pending' && <span>🕐 Sin abonos verificados: la entrada se mantiene en estado PENDIENTE.</span>}
+                </div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider shrink-0 ${statusBadge[modalNewStatus]}`}>
                   {statusLabel[modalNewStatus]}
                 </span>
@@ -749,7 +812,7 @@ export default function Sales() {
                     onClick={handleVerifyAll}
                     className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5"
                   >
-                    <CheckCircle size={14} /> Marcar todos los abonos como Validados
+                    <CheckCircle size={14} /> <span>Marcar todos los abonos como Validados</span>
                   </button>
                 </div>
               )}
@@ -765,7 +828,7 @@ export default function Sales() {
                     onClick={() => setShowAddManualPayment(!showAddManualPayment)}
                     className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 transition"
                   >
-                    <PlusCircle size={14} /> {showAddManualPayment ? 'Ocultar formulario' : '+ Agregar Abono Manual'}
+                    <PlusCircle size={14} /> <span>{showAddManualPayment ? 'Ocultar formulario' : '+ Agregar Abono Manual'}</span>
                   </button>
                 </div>
 
@@ -850,7 +913,7 @@ export default function Sales() {
                         onClick={handleAddManualPayment}
                         className="px-4 py-1.5 text-xs font-bold bg-primary text-white hover:bg-primary-dark rounded-xl transition"
                       >
-                        Agregar Abono
+                        <span>Agregar Abono</span>
                       </button>
                     </div>
                   </div>
@@ -866,7 +929,7 @@ export default function Sales() {
                   <div className="space-y-3">
                     {editablePayments.map((p, idx) => (
                       <div 
-                        key={idx} 
+                        key={p.operationNumber ? `${p.operationNumber}-${idx}` : `abono-${idx}`} 
                         className={`p-4 rounded-2xl border transition-all ${
                           p.verified 
                             ? 'bg-green-50/50 border-green-200' 
@@ -897,7 +960,7 @@ export default function Sales() {
                             </div>
 
                             <p className="text-[11px] text-slate-400">
-                              📅 {p.date} {p.note ? `· ${p.note}` : ''}
+                              <span>📅 {p.date} {p.note ? `· ${p.note}` : ''}</span>
                             </p>
 
                             {/* Badge OCR si existe */}
@@ -914,7 +977,7 @@ export default function Sales() {
                                 onClick={() => setVoucherModal(p.voucherBase64!)}
                                 className="text-primary font-bold text-xs hover:underline inline-flex items-center gap-1 mt-1"
                               >
-                                <Eye size={13} /> 👁️ Ver captura de comprobante ({p.operationNumber || 'voucher'})
+                                <Eye size={13} /> <span>👁️ Ver captura de comprobante ({p.operationNumber || 'voucher'})</span>
                               </button>
                             )}
                           </div>
@@ -953,11 +1016,11 @@ export default function Sales() {
                             >
                               {p.verified ? (
                                 <>
-                                  <CheckCircle size={14} /> Validado
+                                  <CheckCircle size={14} /> <span>Validado</span>
                                 </>
                               ) : (
                                 <>
-                                  <Clock size={14} /> Validar Abono
+                                  <Clock size={14} /> <span>Validar Abono</span>
                                 </>
                               )}
                             </button>
@@ -981,7 +1044,7 @@ export default function Sales() {
                   onClick={() => setManagingSale(null)} 
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-white transition text-xs"
                 >
-                  Cancelar
+                  <span>Cancelar</span>
                 </button>
                 <button 
                   type="button"
@@ -989,7 +1052,7 @@ export default function Sales() {
                   onClick={handleSavePayments} 
                   className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition text-xs flex items-center gap-1.5 shadow-md"
                 >
-                  {isSavingPayments ? 'Guardando...' : 'Guardar y Actualizar Estado'}
+                  <span>{isSavingPayments ? 'Guardando...' : 'Guardar y Actualizar Estado'}</span>
                 </button>
               </div>
             </div>
@@ -1375,6 +1438,105 @@ export default function Sales() {
                 }
               }} className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition text-sm font-bold shadow-md">Crear Registro</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Eliminación Segura con Contraseña */}
+      {deletingSale && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto"
+          onClick={() => { if (!isDeleting) setDeletingSale(null); }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden my-8" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-slate-200 bg-red-50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 text-red-700">
+                <div className="p-2 bg-red-100 rounded-xl">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Eliminar Venta / Reserva</h3>
+                  <p className="text-xs text-red-600 font-semibold">Acción destructiva protegida con clave</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingSale(null)}
+                className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center font-bold text-base transition"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmDelete} className="p-6 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Cliente:</span>
+                  <span className="font-bold text-slate-900 text-right">{deletingSale.fullName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Documento:</span>
+                  <span className="font-mono font-bold text-slate-800">{deletingSale.docType || 'DNI'} {deletingSale.dni}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Zona / Butaca:</span>
+                  <span className="font-bold text-primary-dark">{deletingSale.zoneName} · {deletingSale.seatId || 'General'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Estado / Monto:</span>
+                  <span className="font-bold text-slate-900">S/ {deletingSale.totalPaid.toFixed(2)} de S/ {deletingSale.totalPrice.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
+                <p className="font-bold">⚠️ Advertencia:</p>
+                <p>Esta acción eliminará la venta de forma irreversible y liberará la butaca en el mapa del teatro para que pueda volver a estar disponible.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Lock size={13} className="text-slate-500" />
+                  <span>Contraseña de Autorización Administrador:</span>
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  required
+                  placeholder="Ingresa la contraseña para autorizar..."
+                  value={deletePassword}
+                  onChange={e => {
+                    setDeletePassword(e.target.value);
+                    setDeleteError('');
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-red-400 font-mono"
+                />
+                {deleteError && (
+                  <p className="text-xs font-bold text-red-600 mt-1.5">
+                    ❌ <span>{deleteError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setDeletingSale(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition"
+                >
+                  <span>Cancelar</span>
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition shadow-md shadow-red-600/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={14} />
+                  <span>{isDeleting ? 'Eliminando...' : 'Eliminar Venta'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

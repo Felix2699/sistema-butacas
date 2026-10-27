@@ -358,6 +358,11 @@ export async function markReservaAsAttended(id: string): Promise<void> {
   });
 }
 
+export async function deleteReserva(id: string): Promise<void> {
+  const reservaRef = doc(db, 'reservas', id);
+  await deleteDoc(reservaRef);
+}
+
 export function subscribeToReservas(callback: (reservas: Reserva[]) => void) {
   return onSnapshot(
     collection(db, 'reservas'), 

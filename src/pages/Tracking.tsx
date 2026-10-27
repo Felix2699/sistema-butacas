@@ -226,13 +226,13 @@ export default function TrackingPortal() {
       const updated = await getReservaByDni(dni);
       if (updated) setTicket(updated);
 
+      setIsSubmittingPayment(false);
       setIsPaymentModalOpen(false);
       setPaymentSuccessMsg('¡Abono registrado con éxito! El equipo de administración revisará tu comprobante.');
       setTimeout(() => setPaymentSuccessMsg(''), 6000);
     } catch (err) {
       console.error(err);
       alert('Error al registrar el abono. Por favor intenta nuevamente.');
-    } finally {
       setIsSubmittingPayment(false);
     }
   };
@@ -597,7 +597,7 @@ export default function TrackingPortal() {
                   onClick={() => setIsPaymentModalOpen(false)}
                   className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition"
                 >
-                  Cancelar
+                  <span>Cancelar</span>
                 </button>
                 <button
                   type="submit"
@@ -605,7 +605,7 @@ export default function TrackingPortal() {
                   className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   {isSubmittingPayment ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={16} />}
-                  Enviar Abono
+                  <span>{isSubmittingPayment ? 'Enviando...' : 'Enviar Abono'}</span>
                 </button>
               </div>
             </form>
